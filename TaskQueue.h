@@ -7,18 +7,20 @@
 #include <queue>
 #include <mutex>
 #include <functional>
+#include <condition_variable>
 
 
 class TaskQueue {
 private:
     std::queue<std::function<void()>> queue_;
     std::mutex mutex_;
-
+    std::condition_variable cv;
 
 public:
     //Using a reference if we use lamda is bad since a referenece to a temporray varaialbe is bad
     void push(std::function<void()> task);
     bool pop(std::function<void()>& task);
+    bool waitPop(std::function<void()>& task);
     bool empty();
 
 };
@@ -26,6 +28,7 @@ public:
 inline void TaskQueue::push(std::function<void()> task) {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.push(task);
+    cv.notify_one();
 }
 
 inline bool TaskQueue::pop(std::function<void()> &task) {
@@ -33,6 +36,17 @@ inline bool TaskQueue::pop(std::function<void()> &task) {
     if (queue_.empty()) {
         return false;
     }
+    task = queue_.front();
+    queue_.pop();
+    return true;
+}
+
+
+inline bool TaskQueue::waitPop(std::function<void()>& task) {
+    //For the conditon varaible using the lock guard is not good
+    std::unique_lock<std::mutex> lock(mutex_);
+    //Need to use the this to acess a memeber variable if we are using a lambda
+    cv.wait(lock, [this]{ return !queue_.empty(); });
     task = queue_.front();
     queue_.pop();
     return true;
