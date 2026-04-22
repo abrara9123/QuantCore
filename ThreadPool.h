@@ -15,7 +15,7 @@ private:
 public:
     ThreadPool(int n);
     ~ThreadPool();
-    void addTask();
+    void addTask(std::function<void()> task);
 
 };
 
@@ -34,11 +34,19 @@ inline ThreadPool::ThreadPool(int n) {
         // To store the threads into a vector we need to use the move then we cannt copy them due to memory safety issue
         ThreadVector.push_back(std::move(t1));
     }
+    for (int i = 0; i < n; i++) {
+        ThreadVector[i].join();
+    }
+}
 
+inline void ThreadPool::addTask(std::function<void()> task) {
+    TaskQueueObject.push(task);
 }
 
 inline ThreadPool::~ThreadPool() {
-
+    for(int i = 0; i < ThreadVector.size(); i++) {
+        ThreadVector[i].join();
+    }
 }
 
 #endif //QUANTCORE_THREADPOOL_H
