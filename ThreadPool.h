@@ -6,11 +6,16 @@
 #include "TaskQueue.h"
 #include <vector>
 #include <thread>
+#include <mutex>
+
 
 class ThreadPool {
 private:
-    std::vector<std::thread> ThreadVector;
+    std::vector<std::jthread> ThreadVector;
     TaskQueue TaskQueueObject;
+    std::condition_variable cv2;
+
+
 
 public:
     ThreadPool(int n);
@@ -24,29 +29,29 @@ inline ThreadPool::ThreadPool(int n) {
     for (int i = 0; i < n; i++) {
         //Use a lambda function to know what code to run on the new threads being made.
         //Each thread will handle a function that we pass in and it will run then go out of scope hten another task is made
-        std::thread t1([this] {
+        std::jthread t1([this] {
     while (true) {
     std::function<void()> task;
     TaskQueueObject.waitPop(task);
-    task();
+
+        if (!TaskQueueObject.waitPop(task)) break;
+ task();
 }
 });
         // To store the threads into a vector we need to use the move then we cannt copy them due to memory safety issue
         ThreadVector.push_back(std::move(t1));
     }
-    for (int i = 0; i < n; i++) {
-        ThreadVector[i].join();
-    }
 }
 
 inline void ThreadPool::addTask(std::function<void()> task) {
     TaskQueueObject.push(task);
+
 }
 
 inline ThreadPool::~ThreadPool() {
-    for(int i = 0; i < ThreadVector.size(); i++) {
-        ThreadVector[i].join();
-    }
+    TaskQueueObject.stopped = true;
+    TaskQueueObject.cv.notify_all();
+
 }
 
 #endif //QUANTCORE_THREADPOOL_H

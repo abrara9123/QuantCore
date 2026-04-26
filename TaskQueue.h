@@ -10,14 +10,18 @@
 #include <condition_variable>
 
 
+
+
 class TaskQueue {
 private:
     std::queue<std::function<void()>> queue_;
     std::mutex mutex_;
-    std::condition_variable cv;
+
 
 public:
     //Using a reference if we use lamda is bad since a referenece to a temporray varaialbe is bad
+    std::condition_variable cv;
+    bool stopped = false;
     void push(std::function<void()> task);
     bool pop(std::function<void()>& task);
     bool waitPop(std::function<void()>& task);
@@ -46,7 +50,9 @@ inline bool TaskQueue::waitPop(std::function<void()>& task) {
     //For the conditon varaible using the lock guard is not good
     std::unique_lock<std::mutex> lock(mutex_);
     //Need to use the this to acess a memeber variable if we are using a lambda
-    cv.wait(lock, [this]{ return !queue_.empty(); });
+
+    cv.wait(lock, [this]{ return !queue_.empty() || stopped; });
+    if (stopped) return false;
     task = queue_.front();
     queue_.pop();
     return true;
